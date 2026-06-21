@@ -161,6 +161,13 @@ function statBox(label, aed, colorClass) {
   </div>`;
 }
 
+function statBoxBig(name, aed, colorClass) {
+  return `<div class="stat-box" style="background:${colorClass}">
+    <div style="font-size:13px;font-weight:800;color:#1e293b;margin-bottom:3px">${name}</div>
+    <div class="val">₹${inr(aed)}</div>
+  </div>`;
+}
+
 function personMini(label, aed) {
   return `<div style="flex:1">
     <div class="person-mini">${label}</div>
@@ -190,6 +197,10 @@ function renderDashboard() {
   const allCats = STATE.homeSending.flatMap(r => r.categories || [{type:'umma',faizal:r.byMe||0,fahad:r.byBrother||0}]);
   const totalF = allCats.reduce((s,c) => s+(c.faizal||0), 0);
   const totalH = allCats.reduce((s,c) => s+(c.fahad||0), 0);
+  const ummaF = allCats.filter(c=>c.type==='umma').reduce((s,c)=>s+(c.faizal||0),0);
+  const ummaH = allCats.filter(c=>c.type==='umma').reduce((s,c)=>s+(c.fahad||0),0);
+  const kuriF = allCats.filter(c=>c.type==='kuri').reduce((s,c)=>s+(c.faizal||0),0);
+  const kuriH = allCats.filter(c=>c.type==='kuri').reduce((s,c)=>s+(c.fahad||0),0);
   const ummaBalance = STATE.ummaAccount.reduce((s,r) => s+(r.type==='deposit'?1:-1)*(r.amount||0), 0);
   const withMe = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='me').reduce((s,r)=>s+r.amount,0);
   const withBro = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='brother').reduce((s,r)=>s+r.amount,0);
@@ -207,9 +218,21 @@ function renderDashboard() {
   <div class="card accent-blue">
     <div class="card-title">🏠 Home Sending</div>
     <div class="stat-row">
-      ${statBox('Faizal Sent', totalF, '#eff6ff')}
-      ${statBox('Fahad Sent', totalH, '#f0fdf4')}
+      ${statBoxBig('Faizal', totalF, '#eff6ff')}
+      ${statBoxBig('Fahad', totalH, '#f0fdf4')}
       ${statBox('Combined', totalF+totalH, '#fdf4ff')}
+    </div>
+    <div class="section-lbl" style="margin-top:10px">🏠 Umma — Total Paid</div>
+    <div class="stat-row">
+      ${statBoxBig('Faizal', ummaF, '#fdf4ff')}
+      ${statBoxBig('Fahad', ummaH, '#fdf4ff')}
+      ${statBox('Total', ummaF+ummaH, '#f5f3ff')}
+    </div>
+    <div class="section-lbl" style="margin-top:10px">🎰 Kuri — Total Paid</div>
+    <div class="stat-row">
+      ${statBoxBig('Faizal', kuriF, '#fff7ed')}
+      ${statBoxBig('Fahad', kuriH, '#fff7ed')}
+      ${statBox('Total', kuriF+kuriH, '#fef3c7')}
     </div>
   </div>
 
@@ -225,9 +248,9 @@ function renderDashboard() {
     ${(withMe>0||withBro>0||Object.keys(dashOtherHolders).length>0)?`
     <div class="section-lbl" style="margin-top:10px">💰 Cash Taken Out</div>
     <div class="stat-row">
-      ${withMe>0?statBox('Faizal Took',withMe,'#eff6ff'):''}
-      ${withBro>0?statBox('Fahad Took',withBro,'#f0fdf4'):''}
-      ${Object.entries(dashOtherHolders).map(([n,a])=>statBox(n+' Took',a,'#fef3c7')).join('')}
+      ${withMe>0?statBoxBig('Faizal',withMe,'#eff6ff'):''}
+      ${withBro>0?statBoxBig('Fahad',withBro,'#f0fdf4'):''}
+      ${Object.entries(dashOtherHolders).map(([n,a])=>statBoxBig(n,a,'#fef3c7')).join('')}
     </div>`:''}
   </div>
 
