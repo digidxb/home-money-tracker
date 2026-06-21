@@ -193,6 +193,11 @@ function renderDashboard() {
   const ummaBalance = STATE.ummaAccount.reduce((s,r) => s+(r.type==='deposit'?1:-1)*(r.amount||0), 0);
   const withMe = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='me').reduce((s,r)=>s+r.amount,0);
   const withBro = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='brother').reduce((s,r)=>s+r.amount,0);
+  const dashOtherHolders = {};
+  STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='other').forEach(r=>{
+    const n = r.byName || 'Other';
+    dashOtherHolders[n] = (dashOtherHolders[n]||0) + r.amount;
+  });
   const oweToPaid = STATE.oweTo.payments.reduce((s,r)=>s+(r.amount||0),0);
   const oweFromPaid = STATE.oweFrom.payments.reduce((s,r)=>s+(r.amount||0),0);
   const oweToBalance = (STATE.oweTo.total||0) - oweToPaid;
@@ -217,11 +222,12 @@ function renderDashboard() {
         <div class="val">${STATE.ummaAccount.length}</div>
       </div>
     </div>
-    ${(withMe>0||withBro>0)?`
+    ${(withMe>0||withBro>0||Object.keys(dashOtherHolders).length>0)?`
     <div class="section-lbl" style="margin-top:10px">💰 Cash Taken Out</div>
     <div class="stat-row">
       ${withMe>0?statBox('Faizal Took',withMe,'#eff6ff'):''}
       ${withBro>0?statBox('Fahad Took',withBro,'#f0fdf4'):''}
+      ${Object.entries(dashOtherHolders).map(([n,a])=>statBox(n+' Took',a,'#fef3c7')).join('')}
     </div>`:''}
   </div>
 
@@ -395,23 +401,37 @@ function renderUmmaAccount() {
   const balance = STATE.ummaAccount.reduce((s,r)=>s+(r.type==='deposit'?1:-1)*(r.amount||0),0);
   const withMe = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='me').reduce((s,r)=>s+r.amount,0);
   const withBro = STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='brother').reduce((s,r)=>s+r.amount,0);
+  const otherHolders = {};
+  STATE.ummaAccount.filter(r=>r.type==='withdrawal'&&r.by==='other').forEach(r=>{
+    const n = r.byName || 'Other';
+    otherHolders[n] = (otherHolders[n]||0) + r.amount;
+  });
   const sorted = [...STATE.ummaAccount].sort((a,b)=>b.date.localeCompare(a.date));
 
-  const rows = sorted.map(r=>`
+  const rows = sorted.map(r=>{
+    const whoLabel = r.by==='me' ? 'Faizal' : r.by==='brother' ? 'Fahad' : (r.byName || 'Other');
+    return `
     <div class="card accent-${r.type==='deposit'?'green':'red'}" style="padding:12px 14px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
             <span class="badge badge-${r.type==='deposit'?'green':'red'}">${r.type==='deposit'?'↑ Deposit':'↓ Withdrawal'}</span>
-            <span class="badge badge-blue">${r.by==='me'?'Faizal':'Fahad'}</span>
+            <span class="badge badge-blue">${whoLabel}</span>
             ${r.bank?`<span style="font-size:11px;color:#64748b">${r.bank}</span>`:''}
           </div>
           <div style="font-weight:700;font-size:15px">₹${inr(r.amount)}</div>
-          <div style="font-size:11px;color:#94a3b8">₹${inr(r.amount)} · ${r.date}</div>
+          <div style="font-size:11px;color:#94a3b8">${r.date}</div>
           ${r.note?`<div style="font-size:11px;color:#64748b;margin-top:2px">${r.note}</div>`:''}
         </div>
         <button class="btn-danger" onclick="deleteUmma('${r.id}')">✕</button>
       </div>
+    </div>`;
+  }).join('');
+
+  const otherHoldingBoxes = Object.entries(otherHolders).map(([n,a])=>`
+    <div class="holding-box" style="background:#fef3c7;border-color:#fde68a">
+      <div class="holding-lbl" style="color:#92400e">👤 ${n.toUpperCase()} TOOK</div>
+      <div style="font-weight:800;font-size:16px">₹${inr(a)}</div>
     </div>`).join('');
 
   return `
@@ -420,19 +440,18 @@ function renderUmmaAccount() {
     <div class="stat-row">
       ${statBox('Account Balance', balance, '#ecfeff')}
     </div>
-    ${(withMe>0||withBro>0)?`
+    ${(withMe>0||withBro>0||Object.keys(otherHolders).length>0)?`
     <div class="section-lbl">💰 Cash Taken Out — Who Has It</div>
     <div class="umma-holding">
       ${withMe>0?`<div class="holding-box holding-me">
         <div class="holding-lbl holding-lbl-me">👤 FAIZAL TOOK</div>
         <div style="font-weight:800;font-size:16px">₹${inr(withMe)}</div>
-        <div style="font-size:11px;color:#94a3b8">₹${inr(withMe)}</div>
       </div>`:''}
       ${withBro>0?`<div class="holding-box holding-bro">
         <div class="holding-lbl holding-lbl-bro">👤 FAHAD TOOK</div>
         <div style="font-weight:800;font-size:16px">₹${inr(withBro)}</div>
-        <div style="font-size:11px;color:#94a3b8">₹${inr(withBro)}</div>
       </div>`:''}
+      ${otherHoldingBoxes}
     </div>`:''}
   </div>
 
@@ -455,10 +474,14 @@ window.showAddUmma = function() {
     </div>
     <div class="form-row">
       <input class="inp" type="number" placeholder="Amount (₹)" id="ua-amount"/>
-      <select class="inp" id="ua-by">
+      <select class="inp" id="ua-by" onchange="toggleOtherName()">
         <option value="me">Faizal</option>
         <option value="brother">Fahad</option>
+        <option value="other">Other (custom)</option>
       </select>
+    </div>
+    <div id="ua-other-name-wrap" style="display:none;margin-bottom:8px">
+      <input class="inp" placeholder="Person's name" id="ua-by-name"/>
     </div>
     <input class="inp" placeholder="Bank name" id="ua-bank" style="margin-bottom:8px"/>
     <input class="inp" placeholder="Note (optional)" id="ua-note"/>
@@ -469,15 +492,28 @@ window.showAddUmma = function() {
   </div>`;
 }
 
+window.toggleOtherName = function() {
+  const wrap = document.getElementById('ua-other-name-wrap');
+  const val = document.getElementById('ua-by').value;
+  wrap.style.display = val === 'other' ? 'block' : 'none';
+}
+
 window.saveUmma = function() {
   const amount = parseFloat(document.getElementById('ua-amount').value)||0;
   if(!amount) return alert('Enter an amount.');
+  const by = document.getElementById('ua-by').value;
+  let byName = '';
+  if (by === 'other') {
+    byName = document.getElementById('ua-by-name').value.trim();
+    if (!byName) return alert("Please enter the person's name.");
+  }
   STATE.ummaAccount.push({
     id:uid(),
     date:document.getElementById('ua-date').value,
     amount,
     type:document.getElementById('ua-type').value,
-    by:document.getElementById('ua-by').value,
+    by,
+    byName,
     bank:document.getElementById('ua-bank').value,
     note:document.getElementById('ua-note').value
   });
